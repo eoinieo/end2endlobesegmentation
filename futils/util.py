@@ -14,6 +14,16 @@ from scipy import ndimage
 from skimage.io import imsave
 import nrrd
 
+import logging
+logger = logging.getLogger(__name__)
+if len(logger.handlers) == 0:
+    LEVEL = logging.INFO
+    logger.setLevel(LEVEL)
+    formatter = logging.Formatter('[%(asctime)-15s] [%(levelname)8s] %(message)s')
+    ch = logging.StreamHandler()
+    ch.setLevel(LEVEL)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 MIN_BOUND = -1000.0
 MAX_BOUND = 400.0
@@ -26,17 +36,14 @@ def get_UID(file_name):
             data = pickle.load(file)
             print(data)
             file.close()
-            
             return data
         except Exception as inst:
-            print type(inst)     # the exception instance
-      
-            print inst           # __str__ allows args to be printed directly
-
+            print(type(inst))     # the exception instance
+            print(inst)           # __str__ allows args to be printed directly
             print('no pickle here')
             return [],[],[]
-    print 'nop'
-    return[],[],[]
+    print('nop')
+    return [],[],[]
    
 #%%    
 def get_scan(file_name):
@@ -52,27 +59,25 @@ def load_itk(filename,original=False,get_orientation=False):
     # Reads the image using SimpleITK
     if(os.path.isfile(filename) ):
         itkimage = sitk.ReadImage(filename)
-        
     else:
-        print 'nonfound:',filename
+        print('nonfound:', filename)
         return [],[],[]
 
-    # Convert the image to a  numpy array first ands then shuffle the dimensions to get axis in the order z,y,x
+    # Convert the image to a  numpy array first and then shuffle the dimensions to get axis in the order z,y,x
     ct_scan = sitk.GetArrayFromImage(itkimage)
         
     #ct_scan[ct_scan>4] = 0 #filter trachea (label 5)
     # Read the origin of the ct_scan, will be used to convert the coordinates from world to voxel and vice versa.
     origin = np.array(list(reversed(itkimage.GetOrigin())))
 
-    # Read the spacing along each dimension
+    # Read the shape and spacing along each dimension
+    shape = np.array(list(reversed(itkimage.GetSize())))
     spacing = np.array(list(reversed(itkimage.GetSpacing())))
 
     if(get_orientation):
         orientation = itkimage.GetDirection()
-        return ct_scan, origin, spacing,orientation
+        return ct_scan, origin, shape, spacing, orientation
 
-    
-    
     return ct_scan, origin, spacing
 #%%
 def save_itk(filename,scan,origin,spacing,dtype = 'uint8'):
@@ -106,6 +111,7 @@ def save_slice_img(folder,scan,uid):
         imsave(os.path.join(folder,uid+'sl_'+str(i)+'.png'),s)
 #%%
 def normalize(image,min_=MIN_BOUND,max_=MAX_BOUND):
+    logger.info('Into normalize where contrast is windowed between {} and {}'.format(MIN_BOUND, MAX_BOUND))
     image = (image - min_) / (max_ - min_)
     image[image>1] = 1.
     image[image<0] = 0.

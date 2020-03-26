@@ -32,3 +32,19 @@ In the script file "train_session.sh", the examples used for our results are pre
 ## Software
 Our project was developed using Python (2.7) and Keras (2.0.4) framework that are required to use it.
 
+
+## Expected usage
+
+From looking at the paper ( https://ieeexplore.ieee.org/document/8489677 ), the training data is:
+* windowed between [-1000, 400];
+* of size 512, 512, 256;
+* max voxel resolution of 1mm;
+* the volume is axially cropped to around the lung volume;
+* the input image gets resampled to 256, 256, 128;
+* patch size is 128, 128, 64;
+
+Note:
+* this implies that the runtime of an inference is approximately the same for all scans, as they all get resampled to the same size;
+* the windowing is completed within the inference, no need to window the scan before sending for inference;
+* to get the best results for a scan, the trick is to axially crop the scan to the lung region before sending to end2end for the final lobe seg.
+* POTENTIAL APPROACH: use end2end to do a first pass, remove all connected components that lie on an edge voxel (artefacts cluster there), then find the 5 largest connected components for the remaining labels, axially crop to include those components only. Repeat process. QA using stats based on final segmentations e.g. lobe volumes, relative lobe centre-of-mass distribution, etc.

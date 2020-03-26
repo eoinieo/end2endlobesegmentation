@@ -12,6 +12,16 @@ from futils.vpatch import deconstruct_patch,reconstruct_patch
 from keras.models import model_from_json
 labels = [0,4,5,6,7,8]
 
+import logging
+logger = logging.getLogger(__name__)
+if len(logger.handlers) == 0:
+    LEVEL = logging.INFO
+    logger.setLevel(LEVEL)
+    formatter = logging.Formatter('[%(asctime)-15s] [%(levelname)8s] %(message)s')
+    ch = logging.StreamHandler()
+    ch.setLevel(LEVEL)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 def one_hot_decoding(img,labels,thresh=[]):
     
@@ -40,7 +50,6 @@ class v_segmentor(object):
         self.trgt_sz    = target_sz
         self.trgt_z_sz  = target_z_sz
 
-        
         if(self.trgt_sz!=self.ptch_sz):
             self.patching = True
         else:
@@ -56,40 +65,30 @@ class v_segmentor(object):
         
     def _normalize(self,scan):
         """returns normalized (0 mean 1 variance) scan"""
-        
         scan = (scan - np.mean(scan))/(np.std(scan))
-        return scan
-    
+        return scan    
    
     def predict(self,x):
-       
         #save shape for further upload
         original_shape = x.shape        
-        
         #normalize input
         x = self._normalize(x)
-       
         #rescale scan to 256,256,128
         rescale_x =  sample_scan(x[:,:,:,np.newaxis],self.trgt_sz,self.trgt_z_sz)
-        
-        
-        
         #let's patch this scan (despatchito)
         if(self.patching):
             x_patch = deconstruct_patch(rescale_x)
         else:
             x_patch = rescale_x
-
         del x,rescale_x      
-        
-       
-            
+
         #update shape to NN - > slice axis is the last in the network
         x_patch = np.rollaxis(x_patch,1,4)
-        
       
-        #run predict
-        pred_array = self.v.predict(x_patch,self.batch_size,verbose=0)
+        #run predict, nb verbose=0 no progress, verbose=1 progress bar, verbose=2?
+        logger.info("Into self.v.predict ")
+        pred_array = self.v.predict(x_patch,self.batch_size,verbose=1)
+        logger.info("Exited self.v.predict ")
 
         # chooses our output :P (0:main pred, 1:aux output, 2-3: deep superv)
         if len(pred_array)>1:
@@ -101,29 +100,17 @@ class v_segmentor(object):
         pred = np.reshape(pred,(pred.shape[0],self.ptch_sz,self.ptch_sz,self.z_sz,-1))
         pred = np.rollaxis(pred,3,1)
         
-        
-        
         if(self.patching):
             pred = reconstruct_patch(pred)
-
-        
-
         
         #one hot decoding
         masks = []
         for p in pred:
             masks.append(one_hot_decoding(p,labels))
         masks=np.array(masks,dtype='uint8')
-        
-        
-
-        
+                
         #upsample back to original shape
         zoom_seq = np.array(original_shape,dtype='float')/np.array(masks.shape,dtype='float')
         final_pred = ndimage.interpolation.zoom(masks,zoom_seq,order=0,prefilter=False)
-        
-       
-        
+
         return np.reshape(final_pred,original_shape)
-        
-#       

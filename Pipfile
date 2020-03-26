@@ -1,0 +1,18 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+keras = "==2.0.4"
+numpy = "==1.18.2"
+scikit-image = "==0.16.2"
+SimpleITK = "==1.2.4"
+scipy = "==1.4.1"
+pynrrd = "==0.4.2"
+tensorflow = "==1.15.2"
+
+[requires]
+python_version = "3.6"
